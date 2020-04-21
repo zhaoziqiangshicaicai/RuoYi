@@ -1,27 +1,23 @@
 package com.ruoyi.framework.config;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import javax.annotation.Resource;
 import javax.servlet.Filter;
-import org.apache.commons.io.IOUtils;
-import org.apache.shiro.cache.ehcache.EhCacheManager;
+
+import com.ruoyi.framework.shiro.cache.ShiroRedisCacheManager;
 import org.apache.shiro.codec.Base64;
-import org.apache.shiro.config.ConfigurationException;
-import org.apache.shiro.io.ResourceUtils;
 import org.apache.shiro.mgt.SecurityManager;
 import org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor;
 import org.apache.shiro.spring.web.ShiroFilterFactoryBean;
 import org.apache.shiro.web.mgt.CookieRememberMeManager;
 import org.apache.shiro.web.mgt.DefaultWebSecurityManager;
 import org.apache.shiro.web.servlet.SimpleCookie;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.spring.SpringUtils;
 import com.ruoyi.framework.shiro.realm.UserRealm;
 import com.ruoyi.framework.shiro.session.OnlineSessionDAO;
@@ -34,10 +30,14 @@ import com.ruoyi.framework.shiro.web.filter.sync.SyncOnlineSessionFilter;
 import com.ruoyi.framework.shiro.web.session.OnlineWebSessionManager;
 import com.ruoyi.framework.shiro.web.session.SpringSessionValidationScheduler;
 import at.pollux.thymeleaf.shiro.dialect.ShiroDialect;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+import redis.clients.jedis.Jedis;
 
 /**
  * 权限配置加载
- * 
+ *
  * @author ruoyi
  */
 @Configuration
@@ -92,11 +92,12 @@ public class ShiroConfig
     // 权限认证失败地址
     @Value("${shiro.user.unauthorizedUrl}")
     private String unauthorizedUrl;
-
+    @Resource
+    private JedisConnectionFactory jedisConnectionFactory;
     /**
      * 缓存管理器 使用Ehcache实现
      */
-    @Bean
+   /* @Bean
     public EhCacheManager getEhCacheManager()
     {
         net.sf.ehcache.CacheManager cacheManager = net.sf.ehcache.CacheManager.getCacheManager("ruoyi");
@@ -111,12 +112,12 @@ public class ShiroConfig
             em.setCacheManager(cacheManager);
             return em;
         }
-    }
+    }*/
 
     /**
      * 返回配置文件流 避免ehcache配置文件一直被占用，无法完全销毁项目重新部署
      */
-    protected InputStream getCacheManagerConfigFileInputStream()
+    /*protected InputStream getCacheManagerConfigFileInputStream()
     {
         String configFile = "classpath:ehcache/ehcache-shiro.xml";
         InputStream inputStream = null;
@@ -136,16 +137,21 @@ public class ShiroConfig
         {
             IOUtils.closeQuietly(inputStream);
         }
+    }*/
+    /**
+     * 生成一个ShiroRedisCacheManager
+     **/
+    public ShiroRedisCacheManager redisCacheManager(){
+        return new ShiroRedisCacheManager(jedisConnectionFactory);
     }
-
     /**
      * 自定义Realm
      */
     @Bean
-    public UserRealm userRealm(EhCacheManager cacheManager)
+    public UserRealm userRealm(RedisConfig config)
     {
         UserRealm userRealm = new UserRealm();
-        userRealm.setCacheManager(cacheManager);
+        userRealm.setCacheManager(redisCacheManager());
         return userRealm;
     }
 
@@ -177,7 +183,7 @@ public class ShiroConfig
     {
         OnlineWebSessionManager manager = new OnlineWebSessionManager();
         // 加入缓存管理器
-        manager.setCacheManager(getEhCacheManager());
+        manager.setCacheManager(redisCacheManager());
         // 删除过期的session
         manager.setDeleteInvalidSessions(true);
         // 设置全局session超时时间
@@ -207,7 +213,7 @@ public class ShiroConfig
         // 记住我
         securityManager.setRememberMeManager(rememberMeManager());
         // 注入缓存管理器;
-        securityManager.setCacheManager(getEhCacheManager());
+        securityManager.setCacheManager(redisCacheManager());
         // session管理器
         securityManager.setSessionManager(sessionManager());
         return securityManager;
@@ -219,7 +225,7 @@ public class ShiroConfig
     public LogoutFilter logoutFilter()
     {
         LogoutFilter logoutFilter = new LogoutFilter();
-        logoutFilter.setCacheManager(getEhCacheManager());
+        logoutFilter.setCacheManager(redisCacheManager());
         logoutFilter.setLoginUrl(loginUrl);
         return logoutFilter;
     }
@@ -255,6 +261,7 @@ public class ShiroConfig
         filterChainDefinitionMap.put("/logout", "logout");
         // 不需要拦截的访问
         filterChainDefinitionMap.put("/login", "anon,captchaValidate");
+        filterChainDefinitionMap.put("/no/**", "anon");
         // 系统权限列表
         // filterChainDefinitionMap.putAll(SpringUtils.getBean(IMenuService.class).selectPermsAll());
 
@@ -337,7 +344,7 @@ public class ShiroConfig
     public KickoutSessionFilter kickoutSessionFilter()
     {
         KickoutSessionFilter kickoutSessionFilter = new KickoutSessionFilter();
-        kickoutSessionFilter.setCacheManager(getEhCacheManager());
+        kickoutSessionFilter.setCacheManager(redisCacheManager());
         kickoutSessionFilter.setSessionManager(sessionManager());
         // 同一个用户最大的会话数，默认-1无限制；比如2的意思是同一个用户允许最多同时两个人登录
         kickoutSessionFilter.setMaxSession(maxSession);
