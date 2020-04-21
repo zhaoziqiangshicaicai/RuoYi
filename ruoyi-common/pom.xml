@@ -22,13 +22,13 @@
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-context-support</artifactId>
 		</dependency>
-		
+
 		<!-- SpringWeb模块 -->
 		<dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-web</artifactId>
         </dependency>
-        
+
         <!--Shiro核心框架 -->
 		<dependency>
 			<groupId>org.apache.shiro</groupId>
@@ -94,7 +94,6 @@
 		    <groupId>javax.servlet</groupId>
 		    <artifactId>javax.servlet-api</artifactId>
 		</dependency>
-		
     </dependencies>
   
 </project>

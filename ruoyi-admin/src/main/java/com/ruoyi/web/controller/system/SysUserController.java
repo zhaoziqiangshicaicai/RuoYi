@@ -3,6 +3,7 @@ package com.ruoyi.web.controller.system;
 import java.util.List;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.validation.annotation.Validated;
@@ -48,6 +49,9 @@ public class SysUserController extends BaseController
 
     @Autowired
     private SysPasswordService passwordService;
+
+    @Value("${server.port}")
+    private String port;
 
     @RequiresPermissions("system:user:view")
     @GetMapping()
@@ -257,5 +261,12 @@ public class SysUserController extends BaseController
     {
         userService.checkUserAllowed(user);
         return toAjax(userService.changeStatus(user));
+    }
+
+    @RequestMapping("port")
+    @ResponseBody
+    public AjaxResult getPort(){
+
+        return success(port);
     }
 }
